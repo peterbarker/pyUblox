@@ -23,7 +23,7 @@ CLASS_CFG = 0x06
 CLASS_MON = 0x0A
 CLASS_AID = 0x0B
 CLASS_TIM = 0x0D
-CLASS_ESF = 0x10
+CLASS_MGA = 0x13
 
 # ACK messages
 MSG_ACK_NACK = 0x00
@@ -126,6 +126,10 @@ MSG_TIM_TP   = 0x01
 MSG_TIM_TM2  = 0x03
 MSG_TIM_SVIN = 0x04
 MSG_TIM_VRFY = 0x06
+
+# MGA messages
+MSG_MGA_ACK  = 0x60
+MSG_MGA_DBD  = 0x80
 
 # port IDs
 PORT_DDC    =0
@@ -496,7 +500,17 @@ msg_types = {
                                                   ['dur', 'meanX', 'meanY', 'meanZ', 'meanV',
                                                    'obs', 'valid', 'active', 'reserved1']),
     (CLASS_INF, MSG_INF_ERROR)  : UBloxDescriptor('INF_ERR', '<18s', ['str']),
-    (CLASS_INF, MSG_INF_DEBUG)  : UBloxDescriptor('INF_DEBUG', '<18s', ['str'])
+    (CLASS_INF, MSG_INF_DEBUG)  : UBloxDescriptor('INF_DEBUG', '<18s', ['str']),
+
+    (CLASS_MGA, MSG_MGA_ACK)  : UBloxDescriptor('MGA_ACK',
+                                                '<BBBB4B',
+                                                ["type","version","infoCode","msgId","msgPayloadStart[4]"]),
+    (CLASS_MGA, MSG_MGA_DBD)  : UBloxDescriptor('MGA_DBD',
+                                                '<12B',
+                                                ['reserved1[12]'],
+                                                '_remaining',
+                                                'B',
+                                                ['data']),
 }
 
 
