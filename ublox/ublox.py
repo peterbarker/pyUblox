@@ -9,6 +9,7 @@ Released under GNU GPL version 3 or later
 import struct
 from datetime import datetime
 import time, os
+import StringIO
 
 # protocol constants
 PREAMBLE1 = 0xb5
@@ -128,6 +129,8 @@ MSG_TIM_SVIN = 0x04
 MSG_TIM_VRFY = 0x06
 
 # MGA messages
+MSG_MGA_ANO  = 0x20
+MSG_MGA_INI_TIME_UTC  = 0x40
 MSG_MGA_ACK  = 0x60
 MSG_MGA_DBD  = 0x80
 
@@ -213,7 +216,6 @@ class UBloxDescriptor:
         count = 0
         msg._recs = []
         fields = self.fields[:]
-        
         for fmt in formats:
             size1 = struct.calcsize(fmt)
             if size1 > len(buf):
@@ -467,7 +469,7 @@ msg_types = {
                                                   '<HHIBBBBBBBBBBHIBBBBBBHII',
                                                   ['version', 'mask1', 'reserved0', 'reserved1', 'reserved2',
                                                    'minSVs', 'maxSVs', 'minCNO', 'reserved5', 'iniFix3D', 
-                                                   'reserved6', 'reserved7', 'reserved8', 'wknRollover',
+                                                   'reserved6', 'reserved7', 'ackAiding', 'wknRollover',
                                                    'reserved9', 'reserved10', 'reserved11',
                                                    'usePPP', 'useAOP', 'reserved12', 'reserved13', 
                                                    'aopOrbMaxErr', 'reserved3', 'reserved4']),
@@ -505,14 +507,19 @@ msg_types = {
     (CLASS_MGA, MSG_MGA_ACK)  : UBloxDescriptor('MGA_ACK',
                                                 '<BBBB4B',
                                                 ["type","version","infoCode","msgId","msgPayloadStart[4]"]),
+    (CLASS_MGA, MSG_MGA_INI_TIME_UTC)  : UBloxDescriptor('MGA_INIT_TIME_UTC',
+                                                '<BBBbHBBBBBBIH2BI',
+                                                ["type","version","ref","leapSecs","year","month","day","hour","minute","second","reserved1","ns","tAccS","reserved2[2]","tAccNs"]),
     (CLASS_MGA, MSG_MGA_DBD)  : UBloxDescriptor('MGA_DBD',
                                                 '<12B',
                                                 ['reserved1[12]'],
                                                 '_remaining',
                                                 'B',
                                                 ['data']),
+    (CLASS_MGA, MSG_MGA_ANO)  : UBloxDescriptor('MGA_ANO',
+                                                '<BBBBBBBB64B4B',
+                                                ["type","version","svId","gnssId","year","month","day","reserved1","data[64]","reserved2[4]"]),
 }
-
 
 class UBloxMessage:
     '''UBlox message class - holds a UBX binary message'''
@@ -563,7 +570,7 @@ class UBloxMessage:
             raise UBloxError('INVALID MESSAGE')
         type = self.msg_type()
         if not type in msg_types:
-            raise UBloxError('Unknown message %s length=%u' % (str(type), len(self._buf)))
+            raise UBloxError('Unknown message (0x%02x 0x%02x) length=%u' % (type[0], type[1], len(self._buf)))
         msg_types[type].unpack(self)
 
     def pack(self):
@@ -581,7 +588,7 @@ class UBloxMessage:
             raise UbloxError('INVALID MESSAGE')
         type = self.msg_type()
         if not type in msg_types:
-            raise UBloxError('Unknown message %s length=%u' % (str(type), len(self._buf)))
+            raise UBloxError('Unknown message (0x%02x 0x%02x)  length=%u' % (type[0],type[1], len(self._buf)))
         return msg_types[type].name
 
     def msg_class(self):
@@ -654,6 +661,9 @@ class UBloxMessage:
 	'''check if a message is valid'''
         return len(self._buf) >= 8 and self.needed_bytes() == 0 and self.valid_checksum()
 
+    def raw(self):
+        '''return the raw bytes'''
+        return self._buf
 
 class UBlox:
     '''main UBlox control class.
@@ -668,7 +678,10 @@ class UBlox:
         self.read_only = False
         self.debug_level = 0
 
-        if self.serial_device.startswith("tcp:"):
+        if isinstance(self.serial_device, file) or isinstance(self.serial_device, StringIO.StringIO):
+            self.dev = self.serial_device
+            self.read_only = True
+        elif self.serial_device.startswith("tcp:"):
             import socket
             a = self.serial_device.split(':')
             destination_addr = (a[1], int(a[2]))
@@ -689,6 +702,15 @@ class UBlox:
         self.preferred_dynamic_model = None
         self.preferred_usePPP = None
         self.preferred_dgps_timeout = None
+
+    @staticmethod
+    def pack_message(msg_class, msg_id, payload):
+        msg = UBloxMessage()
+        msg._buf = struct.pack('<BBBBH', 0xb5, 0x62, msg_class, msg_id, len(payload))
+        msg._buf += payload
+        (ck_a, ck_b) = msg.checksum(msg._buf[2:])
+        msg._buf += struct.pack('<BB', ck_a, ck_b)
+        return msg
 
     def close(self):
 	'''close the device'''
@@ -768,14 +790,11 @@ class UBlox:
 
     def set_binary(self):
 	'''put a UBlox into binary mode using a NMEA string'''
+        print("Hpo")
         if not self.read_only:
             print("try set binary at %u" % self.baudrate)
-            self.send_nmea("$PUBX,41,0,0007,0001,%u,0" % self.baudrate)
-            self.send_nmea("$PUBX,41,1,0007,0001,%u,0" % self.baudrate)
-            self.send_nmea("$PUBX,41,2,0007,0001,%u,0" % self.baudrate)
-            self.send_nmea("$PUBX,41,3,0007,0001,%u,0" % self.baudrate)
-            self.send_nmea("$PUBX,41,4,0007,0001,%u,0" % self.baudrate)
-            self.send_nmea("$PUBX,41,5,0007,0001,%u,0" % self.baudrate)
+            for i in range(0,6):
+                self.send_nmea("$PUBX,41,%u,0007,0001,%u,0" % (i,self.baudrate))
 
     def seek_percent(self, pct):
 	'''seek to the given percentage of a file'''
@@ -803,12 +822,18 @@ class UBlox:
                 self.send(msg)
                 if pollit:
                     self.configure_poll(CLASS_CFG, MSG_CFG_NAV5)
-        if msg.name() == 'CFG_NAVX5' and self.preferred_usePPP is not None:
+        if msg.name() == 'CFG_NAVX5':
             msg.unpack()
-            if msg.usePPP != self.preferred_usePPP:
-                msg.usePPP = self.preferred_usePPP
-                msg.mask = 1<<13
+            if (((self.preferred_usePPP is not None) and msg.usePPP != self.preferred_usePPP)
+                or msg.ackAiding != 1):
+                mask = 0
+                if self.preferred_usePPP is not None:
+                    msg.usePPP = self.preferred_usePPP
+                    mask = mask|1<<13
+                msg.ackAiding = 1
+                msg.mask = mask|1<<10
                 msg.pack()
+                print("Sending config")
                 self.send(msg)
                 self.configure_poll(CLASS_CFG, MSG_CFG_NAVX5)
 
@@ -855,11 +880,7 @@ class UBlox:
 
     def send_message(self, msg_class, msg_id, payload):
 	'''send a ublox message with class, id and payload'''
-        msg = UBloxMessage()
-        msg._buf = struct.pack('<BBBBH', 0xb5, 0x62, msg_class, msg_id, len(payload))
-        msg._buf += payload
-        (ck_a, ck_b) = msg.checksum(msg._buf[2:])
-        msg._buf += struct.pack('<BB', ck_a, ck_b)
+        msg = self.pack_message(msg_class, msg_id, payload)
         self.send(msg)
 
     def configure_solution_rate(self, rate_ms=200, nav_rate=1, timeref=0):
@@ -904,4 +925,3 @@ class UBlox:
         ''' Reset the module for hot/warm/cold start'''
         payload = struct.pack('<HBB', set, mode, 0)
         self.send_message(CLASS_CFG, MSG_CFG_RST, payload)
-
