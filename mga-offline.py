@@ -38,17 +38,17 @@ tool.run()
 
 
 
-        self.dev = ublox.UBlox(opts.port, baudrate=opts.baudrate, timeout=2)
-        self.configure_dev()
+        # self.dev = ublox.UBlox(opts.port, baudrate=opts.baudrate, timeout=2)
+        # self.configure_dev()
 
-        do_request = False
-        if do_request:
-            out_fh = open("/tmp/mga-offline.ubx", "w")
+        # do_request = False
+        # if do_request:
+        #     out_fh = open("/tmp/mga-offline.ubx", "w")
 
-            token = "U9cXKihAAkOqBwXwcl5vmA"
-            mgaofflinerequester = mga.MGAOfflineRequester(token=token)
-            fh = mgaofflinerequester.make_request()
-            content = fh.read()
-            out_fh.write(content)
-            fh.close()
+        #     token = "U9cXKihAAkOqBwXwcl5vmA"
+        #     mgaofflinerequester = mga.MGAOfflineRequester(token=token)
+        #     fh = mgaofflinerequester.make_request()
+        #     content = fh.read()
+        #     out_fh.write(content)
+        #     fh.close()
 
