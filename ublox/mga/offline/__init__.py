@@ -84,7 +84,8 @@ class OfflineCache(object):
         # first find date in the cache closest to today
         dev = self.cache_dev()
         if dev is None:
-            return
+            print("no cache dev")
+            return None
 
         now_date_utc = self.now_date_utc()
         closest = None
@@ -93,13 +94,13 @@ class OfflineCache(object):
             msg = dev.receive_message()
             if msg is None:
                 break
-#            print("received message: %s" % str(msg))
+            print("received message: %s" % str(msg))
 
             data_date_utc = self.date_utc_for_message(msg)
-#            print("date: %s" % str(data_date_utc))
+            print("date: %s" % str(data_date_utc))
 
             delta = abs(now_date_utc - data_date_utc)
-#            print("Delta: %s" % str(delta))
+            print("Delta: %s" % str(delta))
             if (closest is None or delta < closest_delta):
                 closest = data_date_utc
                 closest_delta = delta
@@ -224,9 +225,12 @@ class Offline(object):
     def upload(self, dev):
         date = self.cache.get_data_date_closest_to_now()
         if date is None:
-#            print("Updating cache (no data?)")
-            self.cache.update_cache()
+            print("Updating cache (no data?)")
+            self.freshen()
             date = self.cache.get_data_date_closest_to_now()
+            if date is None:
+                print("No data after freshen)")
+                return
 
 #        print("Got date (%s)" % str(date))
         msgs = self.cache.messages_for_date(date)
