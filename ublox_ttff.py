@@ -36,6 +36,7 @@ class TTFF(mga_tool.MGATool):
 
     def configure_dev(self):
 #        self.dev.set_logfile(opts.log, append=opts.append)
+        print("Set_binary")
         self.dev.set_binary()
         self.dev.configure_poll_port()
 #        self.dev.configure_poll(ublox.CLASS_CFG, ublox.MSG_CFG_USB)
@@ -70,6 +71,7 @@ class TTFF(mga_tool.MGATool):
         self.dev.configure_message_rate(ublox.CLASS_NAV, ublox.MSG_NAV_DOP, 0)
         self.dev.configure_message_rate(ublox.CLASS_NAV, ublox.MSG_NAV_PVT, 0)
         self.dev.configure_poll(ublox.CLASS_CFG, ublox.MSG_CFG_NAVX5)
+        print("here")
 
     def get_fix(self, mga_dbd_source_dev=None, mga_offline_cache_file=None):
         self.state = self.state_deathly_cold
@@ -86,10 +88,13 @@ class TTFF(mga_tool.MGATool):
                 self.state = self.state_first_configure
                 # fall through....
             if self.state == self.state_first_configure:
+                print("Calling configure dev")
                 self.configure_dev()
+                print("Called configure dev")
                 self.state = self.state_configuring
+            print("Hi")
             msg = self.dev.receive_message()
-#            sys.stdout.write("msg: %s\r" % (msg,))
+            sys.stdout.write("msg: %s\r" % (msg,))
             if msg is not None:
                 msg.unpack()
                 print(str(msg))

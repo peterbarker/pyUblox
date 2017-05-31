@@ -50,7 +50,9 @@ class MGATool(object):
 
     def configure_dev(self):
 #        self.dev.set_logfile(opts.log, append=opts.append)
+        print("Start")
         self.dev.set_binary()
+        print("Done")
         self.dev.configure_poll_port()
 #        self.dev.configure_poll(ublox.CLASS_CFG, ublox.MSG_CFG_USB)
 #        self.dev.configure_poll(ublox.CLASS_MON, ublox.MSG_MON_HW)
